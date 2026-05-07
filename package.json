@@ -1,0 +1,34 @@
+{
+  "name": "markitdown-ui",
+  "version": "2.0.0",
+  "description": "Typora-style file-to-Markdown converter with LLM enhancement",
+  "author": "周博昊",
+  "license": "MIT",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "electron:dev": "vite",
+    "preview": "vite preview",
+    "build:backend": "MDGUI\\Scripts\\python.exe -m PyInstaller --onefile --name markitdown-backend --distpath release --workpath build\\pyinstaller --specpath build --hidden-import mammoth --hidden-import pdfminer --hidden-import openpyxl --hidden-import markitdown --hidden-import python-docx --hidden-import python-pptx --hidden-import pdfplumber --hidden-import comtypes --hidden-import fastapi --hidden-import uvicorn --hidden-import httpx --hidden-import pydantic --hidden-import starlette --runtime-hook scripts\\pyinstaller-hooks\\runtime-hooks.py backend\\main.py",
+    "build:frontend": "vite build",
+    "build:installer": "set \"CSC_IDENTITY_AUTO_DISCOVERY=false\" && set \"ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/\" && electron-builder",
+    "build": "npm run build:frontend && npm run build:backend && npm run build:installer"
+  },
+  "dependencies": {
+    "marked": "^18.0.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.0",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vite-plugin-electron": "^0.28.0",
+    "vite-plugin-electron-renderer": "^0.14.0"
+  }
+}

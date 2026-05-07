@@ -1,0 +1,32 @@
+# MarkItDown UI v2.0 — Python Backend Dependencies
+# Python >= 3.10 required
+
+# ============================================================
+# HTTP Server
+# ============================================================
+fastapi>=0.110.0
+uvicorn>=0.29.0
+
+# ============================================================
+# Core (required)
+# ============================================================
+markitdown>=0.0.1             # File-to-Markdown conversion engine
+httpx>=0.27.0                 # Async HTTP client for LLM API
+Pillow>=10.0.0                # Image processing
+
+# ============================================================
+# Optional - Legacy .doc support (Windows only)
+# ============================================================
+comtypes>=1.4.0               # Windows COM automation for .doc -> .docx
+python-docx>=1.1.0            # DOCX reading (fallback, image extraction)
+
+# ============================================================
+# Optional - Document image extraction
+# ============================================================
+python-pptx>=0.6.23           # PPTX image extraction
+pdfplumber>=0.11.0            # PDF image extraction
+
+# ============================================================
+# Testing
+# ============================================================
+pytest>=8.0.0

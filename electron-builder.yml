@@ -1,0 +1,29 @@
+appId: com.markitdown-ui.app
+productName: MarkItDown GUI
+copyright: Copyright © 2026 周博昊
+
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/
+
+directories:
+  output: release
+  buildResources: assets
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - assets/**/*
+
+extraResources:
+  - from: release/markitdown-backend.exe
+    to: backend/markitdown-backend.exe
+  - from: assets/
+    to: assets/
+
+win:
+  target:
+    - target: portable
+      arch: [x64]
+  icon: assets/icon.ico
+  sign: null
+  signAndEditExecutable: false

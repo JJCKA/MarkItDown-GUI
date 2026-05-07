@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-electron/
+release/
+build/
+__pycache__/
+*.pyc
+*.spec
+MDGUI/
+venv/
+*.egg-info/
+.env
+*.log
+.DS_Store
+Thumbs.db
