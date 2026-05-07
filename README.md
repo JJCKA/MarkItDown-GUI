@@ -27,11 +27,19 @@
 | 后端 | Python 3.13 + FastAPI + markitdown + httpx |
 | 打包 | PyInstaller + electron-builder |
 
-## 免责声明
+## 使用条款
 
-- 本项目仅用于个人学习与编程练习，不涉及任何商业用途。
-- 界面设计模仿 Typora 的极简风格，但所有代码均为独立编写，未使用 Typora 的任何源代码、资源文件或商标资产。
-- 如有版权或商标方面的顾虑，请联系作者。
+- 本项目仅供个人学习、研究、非商业用途。未经作者许可，不得用于任何商业目的。
+- 如需二次开发、修改或再发布，必须保留原始作者署名，并在衍生项目中注明来源。
+- 界面视觉风格受 Typora 启发，所有代码均为独立编写，未使用 Typora 的源代码、资源或商标。
+- 核心文件转换引擎由 [Microsoft markitdown](https://github.com/microsoft/markitdown) 提供（MIT License），Markdown 渲染由 [marked](https://github.com/markedjs/marked) 提供。
+
+## 鸣谢
+
+- [markitdown](https://github.com/microsoft/markitdown) — Microsoft 开源的文件转 Markdown 引擎
+- [marked](https://github.com/markedjs/marked) — Markdown 解析与渲染库
+- [React](https://react.dev) / [Electron](https://www.electronjs.org) / [FastAPI](https://fastapi.tiangolo.com) — 底层框架
+- 界面设计灵感来自 [Typora](https://typora.io)
 
 ## 开发环境
 
@@ -161,4 +169,4 @@ scripts\build.bat
 
 ## 许可证
 
-MIT License — 见 [LICENSE](LICENSE) 文件。
+本项目代码采用 MIT License，见 [LICENSE](LICENSE) 文件。同时受上述「使用条款」约束：禁止商用，衍生作品须署名。
