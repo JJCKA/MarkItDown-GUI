@@ -14,7 +14,7 @@ if %ERRORLEVEL% neq 0 goto :error
 
 echo.
 echo [2/3] Building backend (PyInstaller)...
-call MDGUI\Scripts\python.exe -m PyInstaller --onefile --name markitdown-backend --distpath release --workpath build\pyinstaller --specpath build --hidden-import mammoth --hidden-import pdfminer --hidden-import openpyxl --hidden-import markitdown --hidden-import python-docx --hidden-import python-pptx --hidden-import pdfplumber --hidden-import comtypes --hidden-import fastapi --hidden-import uvicorn --hidden-import httpx --hidden-import pydantic --hidden-import starlette --runtime-hook scripts\pyinstaller-hooks\runtime-hooks.py backend\main.py
+call MDGUI\Scripts\python.exe -m PyInstaller --onefile --name markitdown-backend --distpath release --workpath build\pyinstaller --specpath build --collect-all markitdown --collect-all mammoth --collect-all pdfminer --collect-all openpyxl --collect-all beautifulsoup4 --collect-all pydub --collect-all speechrecognition --collect-all python-docx --collect-all python-pptx --collect-all pdfplumber --collect-all pandas --hidden-import comtypes --hidden-import fastapi --hidden-import uvicorn --hidden-import httpx --hidden-import pydantic --hidden-import starlette --additional-hooks-dir scripts\pyinstaller-hooks --runtime-hook scripts\pyinstaller-hooks\runtime-hooks.py backend\main.py
 if %ERRORLEVEL% neq 0 goto :error
 
 echo.

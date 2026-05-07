@@ -2,7 +2,7 @@
   "name": "markitdown-ui",
   "version": "2.0.0",
   "description": "Typora-style file-to-Markdown converter with LLM enhancement",
-  "author": "周博昊",
+  "author": "JJCKA",
   "license": "MIT",
   "main": "dist-electron/main.js",
   "scripts": {
