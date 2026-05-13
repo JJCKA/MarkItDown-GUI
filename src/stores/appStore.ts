@@ -1,7 +1,42 @@
 import { create } from 'zustand'
 import { ConversionResult, HistoryItem } from '@/api/client'
 
-type ViewState = 'editor' | 'settings' | 'history'
+export interface QueueItem {
+  path: string
+  name: string
+  status: 'pending' | 'converting' | 'done' | 'error' | 'cancelled'
+  result?: ConversionResult
+  error?: string
+}
+
+interface ConversionStats {
+  totalConversions: number
+  totalChars: number
+  llmCalls: number
+  totalTimeMs: number
+  successCount: number
+  failCount: number
+}
+
+const STATS_KEY = 'markitdown-ui-stats'
+
+function loadStats(): ConversionStats {
+  try {
+    const raw = localStorage.getItem(STATS_KEY)
+    if (raw) return { ...getDefaultStats(), ...JSON.parse(raw) }
+  } catch {}
+  return getDefaultStats()
+}
+
+function getDefaultStats(): ConversionStats {
+  return { totalConversions: 0, totalChars: 0, llmCalls: 0, totalTimeMs: 0, successCount: 0, failCount: 0 }
+}
+
+function saveStats(stats: ConversionStats) {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)) } catch {}
+}
+
+type ViewState = 'editor' | 'settings' | 'history' | 'stats'
 
 interface ConversionProgress {
   current: number
@@ -31,9 +66,13 @@ interface AppStore {
   activeTab: 'files' | 'converted'
   setActiveTab: (t: 'files' | 'converted') => void
 
-  // View mode
-  isSourceMode: boolean
-  toggleSourceMode: () => void
+  // View mode (preview / source toggle)
+  viewMode: 'preview' | 'source'
+  cycleViewMode: () => void
+
+  // Compare overlay
+  compareVisible: boolean
+  setCompareVisible: (v: boolean) => void
 
   // Files
   rootPaths: string[]
@@ -78,6 +117,23 @@ interface AppStore {
   // History
   historyItems: HistoryItem[]
   setHistoryItems: (items: HistoryItem[]) => void
+
+  // Navigation flag — skip useEffect auto-select when clicking history/queue items
+  skipAutoSelect: boolean
+  setSkipAutoSelect: (v: boolean) => void
+
+  // Stats
+  stats: ConversionStats
+  recordConversion: (result: ConversionResult) => void
+
+  // Queue
+  queueItems: QueueItem[]
+  queueVisible: boolean
+  setQueueVisible: (v: boolean) => void
+  initQueue: (paths: string[]) => void
+  updateQueueItem: (path: string, update: Partial<QueueItem>) => void
+  clearQueue: () => void
+  cancelQueue: () => void
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -95,8 +151,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
   activeTab: 'files',
   setActiveTab: (t) => set({ activeTab: t }),
 
-  isSourceMode: false,
-  toggleSourceMode: () => set(s => ({ isSourceMode: !s.isSourceMode })),
+  viewMode: 'preview',
+  cycleViewMode: () => set(s => ({
+    viewMode: s.viewMode === 'preview' ? 'source' : 'preview'
+  })),
+
+  compareVisible: false,
+  setCompareVisible: (v) => set({ compareVisible: v }),
 
   rootPaths: [],
   addRootPaths: (paths) => {
@@ -154,4 +215,49 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   historyItems: [],
   setHistoryItems: (items) => set({ historyItems: items }),
+
+  skipAutoSelect: false,
+  setSkipAutoSelect: (v) => set({ skipAutoSelect: v }),
+
+  stats: loadStats(),
+  recordConversion: (result) => {
+    const current = get().stats
+    const updated: ConversionStats = {
+      totalConversions: current.totalConversions + 1,
+      totalChars: current.totalChars + (result.char_count || 0),
+      llmCalls: current.llmCalls + (result.used_llm ? 1 : 0),
+      totalTimeMs: current.totalTimeMs + (result.elapsed_ms || 0),
+      successCount: current.successCount + (result.success ? 1 : 0),
+      failCount: current.failCount + (result.success ? 0 : 1),
+    }
+    saveStats(updated)
+    set({ stats: updated })
+  },
+
+  queueItems: [],
+  queueVisible: false,
+  setQueueVisible: (v) => set({ queueVisible: v }),
+  initQueue: (paths) => {
+    const items: QueueItem[] = paths.map(p => ({
+      path: p,
+      name: p.split(/[/\\]/).pop() || p,
+      status: 'pending',
+    }))
+    set({ queueItems: items, queueVisible: true })
+  },
+  updateQueueItem: (path, update) => {
+    set(s => ({
+      queueItems: s.queueItems.map(item =>
+        item.path === path ? { ...item, ...update } : item
+      ),
+    }))
+  },
+  clearQueue: () => set({ queueItems: [], queueVisible: false }),
+  cancelQueue: () => {
+    set(s => ({
+      queueItems: s.queueItems.map(item =>
+        item.status === 'pending' ? { ...item, status: 'cancelled' as const } : item
+      ),
+    }))
+  },
 }))

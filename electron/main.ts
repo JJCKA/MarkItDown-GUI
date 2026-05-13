@@ -7,6 +7,17 @@ let mainWindow: BrowserWindow | null = null
 let pythonProcess: ChildProcess | null = null
 let backendPort = 18720
 
+function killBackendTree() {
+  if (!pythonProcess) return
+  // On Windows, kill the entire process tree (parent + all children)
+  try {
+    spawn('taskkill', ['/F', '/T', '/PID', String(pythonProcess.pid)], { stdio: 'ignore' })
+  } catch {
+    pythonProcess.kill()
+  }
+  pythonProcess = null
+}
+
 function findBackend(): { executable: string; args: string[] } {
   // 1. PyInstaller-bundled exe (production)
   const bundledExe = path.join(process.resourcesPath, 'backend', 'markitdown-backend.exe')
@@ -206,16 +217,10 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  if (pythonProcess) {
-    pythonProcess.kill()
-    pythonProcess = null
-  }
+  killBackendTree()
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('before-quit', () => {
-  if (pythonProcess) {
-    pythonProcess.kill()
-    pythonProcess = null
-  }
+  killBackendTree()
 })

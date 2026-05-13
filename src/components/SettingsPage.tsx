@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import * as api from '@/api/client'
 
 interface SettingsData {
@@ -30,14 +30,24 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsData | null>(null)
   const [testStatus, setTestStatus] = useState('')
   const [testOk, setTestOk] = useState(false)
+  const [cacheMax, setCacheMax] = useState(50)
+  const [cacheCount, setCacheCount] = useState(0)
+  const [confirmAction, setConfirmAction] = useState<string | null>(null)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     api.getSettings().then(data => setSettings(data as SettingsData)).catch(() => {})
+    api.getCacheInfo().then(info => { setCacheMax(info.max_items); setCacheCount(info.count) }).catch(() => {})
   }, [])
 
-  // Auto-save on settings change
+  // Auto-save on settings change (debounced 500ms)
   useEffect(() => {
-    if (settings) api.saveSettings(settings).catch(() => {})
+    if (!settings) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      api.saveSettings(settings).catch(() => {})
+    }, 500)
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   }, [settings])
 
   const updateLLM = useCallback((key: string, value: any) => {
@@ -64,7 +74,6 @@ export default function SettingsPage() {
   const handleProviderChange = useCallback((provider: string) => {
     const urls: Record<string, string> = {
       'OpenAI': 'https://api.openai.com/v1',
-      'Anthropic': 'https://api.anthropic.com/v1',
       '自定义端点': '',
     }
     setSettings(prev => prev ? {
@@ -88,6 +97,18 @@ export default function SettingsPage() {
 
   const handleClearHistory = useCallback(async () => {
     await api.clearHistory()
+    setConfirmAction(null)
+  }, [])
+
+  const handleClearCache = useCallback(async () => {
+    await api.clearCache()
+    setCacheCount(0)
+    setConfirmAction(null)
+  }, [])
+
+  const handleCacheMaxChange = useCallback((val: number) => {
+    setCacheMax(val)
+    api.updateCacheConfig(val).catch(() => {})
   }, [])
 
   if (!settings) {
@@ -105,9 +126,6 @@ export default function SettingsPage() {
       flex: 1, overflowY: 'auto', padding: '20px 24px',
       fontFamily: 'var(--font-ui)',
     }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>
-        设置
-      </h2>
 
       {/* LLM Section */}
       <Card title="LLM 模型配置">
@@ -118,7 +136,6 @@ export default function SettingsPage() {
             style={selectStyle}
           >
             <option>OpenAI</option>
-            <option>Anthropic</option>
             <option>自定义端点</option>
           </select>
         </Field>
@@ -191,24 +208,57 @@ export default function SettingsPage() {
         </Field>
       </Card>
 
-      {/* History */}
-      <Card title="历史记录">
-        <button
-          onClick={handleClearHistory}
-          style={{
-            margin: '4px 16px 14px',
-            height: 28, padding: '0 12px',
-            background: 'transparent', border: 'none',
-            color: '#e94560', fontSize: 12,
-            fontFamily: 'var(--font-ui)',
-            cursor: 'pointer', borderRadius: 'var(--radius-sm)',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = '#f5e0e0'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-          清除所有历史记录
-        </button>
+      {/* Cache & History */}
+      <Card title="历史记录与缓存">
+        <Field label="最大缓存:">
+          <input type="number" value={cacheMax} min={1} max={500}
+            onChange={e => handleCacheMaxChange(parseInt(e.target.value) || 50)}
+            style={{ ...inputStyle, width: 80 }} />
+          <span style={{ fontSize: 11, color: 'var(--faint)', marginLeft: 4 }}>
+            当前缓存 {cacheCount} 条
+          </span>
+        </Field>
+        <div style={{ padding: '8px 16px', display: 'flex', gap: 8 }}>
+          <button onClick={() => setConfirmAction('cache')} style={dangerBtnStyle}>
+            清除缓存
+          </button>
+          <button onClick={() => setConfirmAction('history')} style={dangerBtnStyle}>
+            清除历史记录
+          </button>
+        </div>
       </Card>
+
+      {/* Confirm dialog */}
+      {confirmAction && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: 'var(--bg)', borderRadius: 'var(--radius-lg)',
+            padding: '24px 28px', minWidth: 280,
+            boxShadow: 'var(--shadow-popup)',
+            fontFamily: 'var(--font-ui)',
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+              {confirmAction === 'cache' ? '确认清除所有缓存？' : '确认清除所有历史记录？'}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
+              {confirmAction === 'cache' ? '缓存的转换结果将被永久删除。' : '历史记录将被永久删除。'}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmAction(null)} style={btnStyle}>取消</button>
+              <button
+                onClick={confirmAction === 'cache' ? handleClearCache : handleClearHistory}
+                style={dangerBtnStyle}
+              >
+                确认
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
@@ -293,6 +343,15 @@ const btnStyle: React.CSSProperties = {
   background: 'var(--accent)', color: '#fff',
   border: 'none', borderRadius: 'var(--radius-md)',
   fontSize: 12, fontWeight: 700,
+  fontFamily: 'var(--font-ui)',
+  cursor: 'pointer',
+}
+
+const dangerBtnStyle: React.CSSProperties = {
+  height: 28, padding: '0 16px',
+  background: 'transparent', color: '#e94560',
+  border: '1px solid #e94560', borderRadius: 'var(--radius-md)',
+  fontSize: 12, fontWeight: 600,
   fontFamily: 'var(--font-ui)',
   cursor: 'pointer',
 }

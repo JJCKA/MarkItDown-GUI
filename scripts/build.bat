@@ -25,7 +25,7 @@ if %ERRORLEVEL% neq 0 goto :error
 echo.
 echo ==========================================
 echo  Build complete!
-echo  Installer: release\MarkItDown Setup *.exe
+echo  Installer: release\MarkItDown GUI *.exe
 echo ==========================================
 goto :end
 

@@ -27,6 +27,7 @@ class ConversionResult:
         self,
         source_path: Path,
         markdown: str = "",
+        raw_markdown: str = "",
         title: str = "",
         success: bool = True,
         error: str = "",
@@ -36,6 +37,7 @@ class ConversionResult:
     ):
         self.source_path = source_path
         self.markdown = markdown
+        self.raw_markdown = raw_markdown or markdown
         self.title = title or source_path.stem
         self.success = success
         self.error = error
@@ -144,7 +146,7 @@ class Converter:
                 self._emit(".doc 转换成功，继续处理...")
 
         # Step 1: Base conversion (run sync via thread pool)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         base_result = await loop.run_in_executor(None, self.convert, actual_path)
 
         if not base_result.success:
@@ -153,6 +155,7 @@ class Converter:
             return base_result
 
         base_result.source_path = file_path
+        base_result.raw_markdown = base_result.markdown
         ext = file_path.suffix.lower()
         actual_ext = actual_path.suffix.lower()
         enable_image = self.config.get("conversion.enable_llm_image", False)

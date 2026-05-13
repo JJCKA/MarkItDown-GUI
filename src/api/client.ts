@@ -18,6 +18,7 @@ export interface ConversionProgress {
 export interface ConversionResult {
   source_path: string
   markdown: string
+  raw_markdown: string
   title: string
   success: boolean
   error: string
@@ -56,6 +57,9 @@ export interface HistoryItem {
   elapsed_ms: number
   used_llm: boolean
   timestamp: string
+  markdown?: string
+  raw_markdown?: string
+  cached?: boolean
 }
 
 // ── API functions ──
@@ -214,4 +218,24 @@ export async function getHistory(): Promise<HistoryItem[]> {
 export async function clearHistory(): Promise<void> {
   const base = await getBaseUrl()
   await fetch(`${base}/api/settings/history`, { method: 'DELETE' })
+}
+
+export async function getCacheInfo(): Promise<{ count: number; max_items: number; cached_files: string[] }> {
+  const base = await getBaseUrl()
+  const resp = await fetch(`${base}/api/settings/cache`)
+  return resp.json()
+}
+
+export async function updateCacheConfig(maxItems: number): Promise<void> {
+  const base = await getBaseUrl()
+  await fetch(`${base}/api/settings/cache-config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ max_items: maxItems }),
+  })
+}
+
+export async function clearCache(): Promise<void> {
+  const base = await getBaseUrl()
+  await fetch(`${base}/api/settings/cache`, { method: 'DELETE' })
 }

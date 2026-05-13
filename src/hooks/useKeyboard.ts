@@ -23,6 +23,8 @@ export function useKeyboard() {
     selectedPaths, isConverting,
     sidebarVisible, toggleSidebar,
     view, setView,
+    viewMode, cycleViewMode,
+    compareVisible, setCompareVisible,
     logVisible, toggleLog,
     showLLMPopup, setShowLLMPopup,
     activeResult,
@@ -122,9 +124,17 @@ export function useKeyboard() {
         return
       }
     }
+    // Ctrl+Shift+V — Toggle compare view
+    if (mod && e.shiftKey && e.key === 'V') {
+      e.preventDefault()
+      setCompareVisible(!compareVisible)
+      return
+    }
   }, [
     selectedPaths, isConverting, sidebarVisible, toggleSidebar,
-    view, setView, logVisible, toggleLog,
+    view, setView, viewMode, cycleViewMode,
+    compareVisible, setCompareVisible,
+    logVisible, toggleLog,
     showLLMPopup, setShowLLMPopup, activeResult,
   ])
 

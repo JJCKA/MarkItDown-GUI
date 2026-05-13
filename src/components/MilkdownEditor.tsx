@@ -1,46 +1,177 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/appStore'
 import { marked } from 'marked'
 
+// Configure marked with custom renderer
+const renderer = new marked.Renderer()
+
+// Task list items
+renderer.listitem = function (token) {
+  const text = typeof token === 'string' ? token : (token.text ?? String(token))
+  if (token.checked === true || text.startsWith('[x] ') || text.startsWith('[X] ')) {
+    const clean = text.replace(/^\[[xX]\]\s*/, '')
+    return `<li class="task-list-item"><input type="checkbox" checked disabled> ${clean}</li>\n`
+  }
+  if (token.checked === false || text.startsWith('[ ] ')) {
+    const clean = text.replace(/^\[ \]\s*/, '')
+    return `<li class="task-list-item"><input type="checkbox" disabled> ${clean}</li>\n`
+  }
+  return `<li>${text}</li>\n`
+}
+
+// Code blocks with language label
+renderer.code = function (token) {
+  const text = typeof token === 'string' ? token : (token.text ?? String(token))
+  const lang = (typeof token === 'object' && token.lang) ? token.lang : ''
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const langAttr = lang ? ` data-lang="${lang}"` : ''
+  return `<pre${langAttr}><code class="language-${lang}">${escaped}</code></pre>\n`
+}
+
+marked.setOptions({ breaks: true, gfm: true, renderer })
+
 export default function MarkdownViewer() {
-  const { activeResult, isSourceMode } = useAppStore()
+  const { activeResult, viewMode, compareVisible, setActiveResult, setResult } = useAppStore()
   const content = activeResult?.markdown || ''
+  const rawContent = activeResult?.raw_markdown || content
 
   const html = useMemo(() => {
     if (!content) return ''
     try {
-      return marked.parse(content, { breaks: true, gfm: true }) as string
+      return marked.parse(content) as string
     } catch { return content }
   }, [content])
+
+  const rawHtml = useMemo(() => {
+    if (!rawContent) return ''
+    try {
+      return marked.parse(rawContent) as string
+    } catch { return rawContent }
+  }, [rawContent])
+
+  // Sync edits back to the result
+  const handleSourceEdit = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (!activeResult) return
+    const updated = { ...activeResult, markdown: e.target.value }
+    setActiveResult(updated)
+    setResult(activeResult.source_path, updated)
+  }, [activeResult, setActiveResult, setResult])
+
+  // Resizable divider for compare mode
+  const [dividerPos, setDividerPos] = useState(50)
+  const compareDrag = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    compareDrag.current = true
+    e.preventDefault()
+    const onMove = (ev: MouseEvent) => {
+      if (!compareDrag.current || !containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const pct = ((ev.clientX - rect.left) / rect.width) * 100
+      setDividerPos(Math.max(20, Math.min(80, pct)))
+    }
+    const onUp = () => {
+      compareDrag.current = false
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [])
 
   return (
     <div style={{
       flex: 1, display: 'flex', flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      {/* Toolbar — copy + export only */}
+      {/* Toolbar */}
       <EditorToolbar />
 
-      <div style={{ flex: 1, overflow: 'hidden', background: 'var(--bg)' }}>
+      <div ref={containerRef} style={{ flex: 1, overflow: 'hidden', background: 'var(--bg)', display: 'flex' }}>
         {content ? (
-          isSourceMode ? (
-            <pre style={{
-              height: '100%', overflow: 'auto',
-              padding: '24px 32px', margin: 0,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 14, lineHeight: 1.7,
-              color: 'var(--text)',
-              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-              userSelect: 'text', border: 'none',
-            }}>
-              {content}
-            </pre>
+          compareVisible ? (
+            /* Compare mode: original file text vs final result */
+            <>
+              <div style={{ width: `${dividerPos}%`, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <div style={{
+                  height: 28, minHeight: 28, display: 'flex', alignItems: 'center',
+                  padding: '0 16px',
+                  fontSize: 12, fontWeight: 600, color: 'var(--muted)', fontFamily: 'var(--font-ui)',
+                  background: 'var(--sidebar)',
+                }}>
+                  原始文件提取
+                </div>
+                <div
+                  className="md-preview"
+                  style={{ flex: 1, overflow: 'auto', userSelect: 'text' }}
+                  dangerouslySetInnerHTML={{ __html: rawHtml }}
+                />
+              </div>
+              <div
+                onMouseDown={onDividerMouseDown}
+                style={{
+                  width: 5, minWidth: 5,
+                  background: 'transparent',
+                  cursor: 'col-resize',
+                  flexShrink: 0,
+                  position: 'relative',
+                }}
+                onMouseEnter={e => {
+                  const inner = e.currentTarget.querySelector('div') as HTMLElement
+                  if (inner) { inner.style.background = 'var(--accent)'; inner.style.width = '5px' }
+                }}
+                onMouseLeave={e => {
+                  const inner = e.currentTarget.querySelector('div') as HTMLElement
+                  if (inner) { inner.style.background = 'var(--border)'; inner.style.width = '1px' }
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 0, bottom: 0,
+                  left: 0, width: 1,
+                  background: 'var(--border)',
+                  transition: 'background 0.15s, width 0.1s',
+                }} />
+              </div>
+              <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <div style={{
+                  height: 28, minHeight: 28, display: 'flex', alignItems: 'center',
+                  padding: '0 16px',
+                  fontSize: 12, fontWeight: 600, color: 'var(--muted)', fontFamily: 'var(--font-ui)',
+                  background: 'var(--sidebar)',
+                }}>
+                  转换结果
+                </div>
+                <div
+                  className="md-preview"
+                  style={{ flex: 1, overflow: 'auto', userSelect: 'text' }}
+                  dangerouslySetInnerHTML={{ __html: html }}
+                />
+              </div>
+            </>
+          ) : viewMode === 'source' ? (
+            /* Source editing mode */
+            <textarea
+              value={content}
+              onChange={handleSourceEdit}
+              spellCheck={false}
+              style={{
+                flex: 1, resize: 'none', border: 'none', outline: 'none',
+                padding: '24px 32px', margin: 0,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 14, lineHeight: 1.7,
+                color: 'var(--text)',
+                background: 'var(--bg)',
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                userSelect: 'text',
+              }}
+            />
           ) : (
+            /* Preview mode (default) */
             <div
               className="md-preview"
               style={{
-                height: '100%', overflow: 'auto',
-                padding: '24px 32px',
+                flex: 1, overflow: 'auto',
                 userSelect: 'text',
               }}
               dangerouslySetInnerHTML={{ __html: html }}
@@ -90,7 +221,11 @@ function EditorToolbar() {
       await fetch(`http://127.0.0.1:${port}/api/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: filePath, content: activeResult.markdown }),
+        body: JSON.stringify({
+          path: filePath,
+          content: activeResult.markdown,
+          source_path: activeResult.source_path,
+        }),
       })
       showToast('已导出')
     }

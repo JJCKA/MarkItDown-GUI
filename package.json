@@ -1,6 +1,6 @@
 {
   "name": "markitdown-ui",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Typora-style file-to-Markdown converter with LLM enhancement",
   "author": "JJCKA",
   "license": "MIT",

@@ -9,6 +9,9 @@
 ```
 GET /health
 → { "status": "ok" }
+
+GET /api/health
+→ { "status": "ok", "version": "2.1.0" }
 ```
 
 ### 基础转换
@@ -17,13 +20,15 @@ GET /health
 POST /api/convert
 Body: { "file_path": "E:/path/to/file.pdf" }
 → {
-    "source_path": "...", "markdown": "...", "title": "...",
-    "success": true, "error": "",
+    "source_path": "...", "markdown": "...", "raw_markdown": "...",
+    "title": "...", "success": true, "error": "",
     "used_llm": false, "elapsed_ms": 1500,
     "char_count": 8500, "word_count": 1200,
     "logs": ["正在转换: file.pdf", "转换完成: ..."]
   }
 ```
+
+`raw_markdown` 始终等于 `markdown`（基础转换无 LLM 增强）。
 
 ### LLM 增强转换
 
@@ -31,6 +36,8 @@ Body: { "file_path": "E:/path/to/file.pdf" }
 POST /api/convert/llm
 Body: { "file_path": "..." }
 → 同上，used_llm: true
+  raw_markdown = markitdown 原始提取结果
+  markdown = LLM 增强后的结果
 
 # SSE 模式
 POST /api/convert/llm?sse=1
@@ -77,9 +84,37 @@ Body: { "provider": "openai", "api_key": "sk-...", "base_url": "...", "model": "
 
 ```
 GET /api/settings/history
-→ [ { "file": "...", "success": true, "chars": 8500, "elapsed_ms": 1500, "used_llm": false, "timestamp": "..." } ]
+→ [
+    {
+      "file": "...", "success": true, "chars": 8500,
+      "elapsed_ms": 1500, "used_llm": false,
+      "timestamp": "2026-05-09T15:30:00.000000",
+      "cached": true,
+      "markdown": "...",        // 仅当 cached=true 时存在
+      "raw_markdown": "..."     // 仅当 cached=true 时存在
+    }
+  ]
 
 DELETE /api/settings/history
+→ { "success": true }
+```
+
+历史记录自动与缓存数据合并返回。`cached` 字段标记该记录是否有缓存的转换结果。
+
+### 缓存管理
+
+```
+GET /api/settings/cache
+→ { "count": 15, "max_items": 50, "cached_files": ["E:/file1.pdf", ...] }
+
+GET /api/settings/cache/{file_path}
+→ { "file": "...", "markdown": "...", "raw_markdown": "...", ... }
+
+PUT /api/settings/cache-config
+Body: { "max_items": 100 }
+→ { "success": true, "max_items": 100 }
+
+DELETE /api/settings/cache
 → { "success": true }
 ```
 
@@ -87,9 +122,15 @@ DELETE /api/settings/history
 
 ```
 POST /api/export
-Body: { "path": "E:/output.md", "content": "# Markdown content" }
+Body: {
+  "path": "E:/output.md",
+  "content": "# Markdown content",
+  "source_path": "E:/original.pdf"   // 可选，用于更新缓存
+}
 → { "success": true }
 ```
+
+如果提供 `source_path`，导出时会自动更新该文件的缓存（用于保存用户编辑后的内容）。
 
 ## 核心类
 
@@ -102,8 +143,23 @@ class Config:
     def save()                                      # 持久化到 JSON
     def get(key: str, default=None)                 # 点号路径读取
     def set(key: str, value)                        # 点号路径写入
-    def add_history(item: dict)                     # 添加历史（自动截断）
+    def add_history(item: dict)                     # 添加历史（自动截断+时间戳）
     def clear_history()
+```
+
+### CacheManager
+
+```python
+class CacheManager:
+    def __init__(cache_path: Path | None = None)  # 默认 ~/.markitdown-ui/cache.json
+    def load()                                      # 从 JSON 加载
+    def save()                                      # 持久化到 JSON
+    def get(file_path: str) -> dict | None          # 获取缓存
+    def put(file_path, markdown, raw_markdown, ...) # 存入缓存
+    def clear()                                     # 清空缓存
+    @property count -> int                          # 当前缓存条数
+    @property cached_files -> set[str]              # 已缓存的文件路径集合
+    max_items: int                                  # 最大缓存条数
 ```
 
 ### Converter
@@ -124,7 +180,8 @@ class Converter:
 ```python
 class ConversionResult:
     source_path: Path
-    markdown: str
+    markdown: str           # 最终结果（LLM 增强后，或基础转换结果）
+    raw_markdown: str       # markitdown 原始提取结果（LLM 前）
     title: str
     success: bool
     error: str
@@ -157,6 +214,9 @@ saveSettings(settings) → void
 testLLMConnection(config) → { success, message }
 getHistory() → HistoryItem[]
 clearHistory() → void
+getCacheInfo() → { count, max_items, cached_files }
+updateCacheConfig(maxItems) → void
+clearCache() → void
 ```
 
 所有函数通过 `window.electronAPI.getBackendPort()` 获取动态端口。

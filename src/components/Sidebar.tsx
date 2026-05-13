@@ -208,6 +208,22 @@ export default function Sidebar() {
           <ClockIcon />
         </button>
 
+        {/* Stats */}
+        <button
+          onClick={() => { if (logVisible) toggleLog(); setView(view === 'stats' ? 'editor' : 'stats') }}
+          style={{
+            width: 40, height: 32,
+            background: view === 'stats' ? 'var(--hover)' : 'transparent',
+            border: 'none', borderRadius: 'var(--radius-sm)',
+            color: 'var(--muted)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.15s',
+          }}
+          title="转换统计"
+        >
+          <StatsIcon />
+        </button>
+
         <div style={{ flex: 1 }} />
       </div>
     </div>
@@ -258,6 +274,16 @@ function ClockIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
       <circle cx="12" cy="12" r="10"/>
       <polyline points="12 6 12 12 16 14"/>
+    </svg>
+  )
+}
+
+function StatsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <rect x="3" y="12" width="4" height="9" rx="1"/>
+      <rect x="10" y="7" width="4" height="14" rx="1"/>
+      <rect x="17" y="3" width="4" height="18" rx="1"/>
     </svg>
   )
 }

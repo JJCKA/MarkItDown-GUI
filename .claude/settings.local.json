@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tasklist)",
+      "Bash(taskkill /F /IM \"MarkItDown GUI.exe\")",
+      "Bash(taskkill /F /IM \"markitdown-backend.exe\")",
+      "Bash(taskkill *)"
+    ]
+  }
+}

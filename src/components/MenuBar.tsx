@@ -23,7 +23,9 @@ const menuDefs: Record<string, MenuItem[]> = {
   ],
   视图: [
     { label: '侧边栏', shortcut: 'Ctrl+B', action: 'toggleSidebar' as any, checked: true },
-    { label: '源码模式', action: 'toggleSource' as any, checked: false },
+    { label: '预览模式', action: 'viewPreview' as any, checked: false },
+    { label: '源码模式', action: 'viewSource' as any, checked: false },
+    { label: '原始 vs 结果 对比', action: 'toggleCompare' as any, checked: false },
     { label: '日志面板', shortcut: 'Ctrl+J', action: 'toggleLog' as any, checked: false },
   ],
   转换: [
@@ -42,7 +44,8 @@ export default function MenuBar() {
   const menuRef = useRef<HTMLDivElement>(null)
   const {
     sidebarVisible, toggleSidebar,
-    isSourceMode, toggleSourceMode,
+    viewMode, cycleViewMode,
+    compareVisible, setCompareVisible,
     logVisible, toggleLog,
     activeResult,
   } = useAppStore()
@@ -62,7 +65,9 @@ export default function MenuBar() {
   // Get checked state for view items
   const getChecked = (label: string) => {
     if (label === '侧边栏') return sidebarVisible
-    if (label === '源码模式') return isSourceMode
+    if (label === '预览模式') return viewMode === 'preview'
+    if (label === '源码模式') return viewMode === 'source'
+    if (label === '原始 vs 结果 对比') return compareVisible
     if (label === '日志面板') return logVisible
     return false
   }
@@ -100,7 +105,9 @@ export default function MenuBar() {
         break
       }
       case 'toggleSidebar': toggleSidebar(); break
-      case 'toggleSource': toggleSourceMode(); break
+      case 'viewPreview': useAppStore.setState({ viewMode: 'preview' }); break
+      case 'viewSource': useAppStore.setState({ viewMode: 'source' }); break
+      case 'toggleCompare': useAppStore.getState().setCompareVisible(!useAppStore.getState().compareVisible); break
       case 'toggleLog': toggleLog(); break
       case 'convert': {
         document.querySelector<HTMLButtonElement>('[data-action="convert-basic"]')?.click()
@@ -110,9 +117,9 @@ export default function MenuBar() {
         document.querySelector<HTMLButtonElement>('[data-action="convert-llm"]')?.click()
         break
       }
-      case 'about': alert('MarkItDown GUI v2.0\n\n模仿 Typora 风格的文件转 Markdown 格式工具，支持 PDF、Word、Excel、PPT、图片、音频等 30+ 格式。\n支持 LLM 解析图片、表单。\n\n作者：JJCKA\n联系方式：1064398651@qq.com'); break
+      case 'about': alert('MarkItDown GUI v2.1.0\n\n模仿 Typora 风格的文件转 Markdown 格式工具，支持 PDF、Word、Excel、PPT、图片、音频等 30+ 格式。\n支持 LLM 增强、批量转换、拖拽打开、历史缓存。\n\n作者：JJCKA\n联系方式：1064398651@qq.com'); break
     }
-  }, [activeResult, toggleSidebar, toggleSourceMode, toggleLog])
+  }, [activeResult, toggleSidebar, cycleViewMode, compareVisible, setCompareVisible, toggleLog])
 
   return (
     <div

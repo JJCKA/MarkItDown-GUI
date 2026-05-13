@@ -26,15 +26,17 @@ try:
     from fastapi import FastAPI, Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse
+    from pydantic import BaseModel
 
     from backend.core.config import Config
+    from backend.core.cache import CacheManager
     from backend.api.convert import router as convert_router
     from backend.api.settings import router as settings_router
 except Exception as e:
     log(f"Import error: {e}\n{traceback.format_exc()}")
     raise
 
-app = FastAPI(title="MarkItDown GUI Backend", version="2.0.0")
+app = FastAPI(title="MarkItDown GUI Backend", version="2.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -63,16 +65,32 @@ async def health():
 
 @app.get("/api/health")
 async def api_health():
-    return {"status": "ok", "version": "2.0.0"}
+    return {"status": "ok", "version": "2.1.0"}
+
+
+class ExportRequest(BaseModel):
+    path: str
+    content: str
+    source_path: str | None = None
+
+
+cache = CacheManager()
 
 
 @app.post("/api/export")
-async def export_file(body: dict):
+async def export_file(body: ExportRequest):
     try:
-        path = body.get("path", "")
-        content = body.get("content", "")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+        if not body.path or not body.path.endswith(".md"):
+            return {"success": False, "error": "无效的导出路径，仅支持 .md 文件"}
+        with open(body.path, "w", encoding="utf-8") as f:
+            f.write(body.content)
+        # Also save edited content to cache
+        if body.source_path:
+            existing = cache.get(body.source_path)
+            raw = existing.get("raw_markdown", "") if existing else ""
+            cache.put(body.source_path, body.content, raw,
+                      True, len(body.content), 0,
+                      existing.get("used_llm", False) if existing else False)
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}

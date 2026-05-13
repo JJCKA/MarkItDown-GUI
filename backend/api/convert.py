@@ -11,11 +11,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.core.config import Config
+from backend.core.cache import CacheManager
 from backend.core.converter import Converter, ConversionResult
 
 router = APIRouter()
 
 config = Config()
+cache = CacheManager()
+cache.max_items = config.get("cache.max_items", 50)
 
 
 class ConvertRequest(BaseModel):
@@ -60,7 +63,7 @@ async def _convert_with_sse(
                 result = await converter.convert_with_llm(fp)
             else:
                 # Run sync convert in thread pool
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 result = await loop.run_in_executor(None, converter.convert, fp)
         except Exception as e:
             result = ConversionResult(
@@ -72,6 +75,7 @@ async def _convert_with_sse(
         yield _make_sse_event("result", {
             "source_path": str(result.source_path),
             "markdown": result.markdown,
+            "raw_markdown": result.raw_markdown,
             "title": result.title,
             "success": result.success,
             "error": result.error,
@@ -82,7 +86,7 @@ async def _convert_with_sse(
             "logs": result.logs,
         })
 
-        # Save to history
+        # Save to history & cache
         config.add_history({
             "file": str(result.source_path),
             "success": result.success,
@@ -90,6 +94,9 @@ async def _convert_with_sse(
             "elapsed_ms": result.elapsed_ms,
             "used_llm": result.used_llm,
         })
+        if result.success:
+            cache.put(str(result.source_path), result.markdown, result.raw_markdown,
+                      result.success, result.char_count, result.elapsed_ms, result.used_llm)
 
     config.save()
     yield _make_sse_event("complete", {"total": len(results)})
@@ -100,7 +107,7 @@ async def convert_basic(req: ConvertRequest):
     """Basic conversion (no LLM)."""
     config.load()  # reload latest settings from disk
     converter = Converter(config)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, converter.convert, req.file_path)
 
     config.add_history({
@@ -110,11 +117,15 @@ async def convert_basic(req: ConvertRequest):
         "elapsed_ms": result.elapsed_ms,
         "used_llm": False,
     })
+    if result.success:
+        cache.put(str(result.source_path), result.markdown, result.raw_markdown,
+                  result.success, result.char_count, result.elapsed_ms, False)
     config.save()
 
     return {
         "source_path": str(result.source_path),
         "markdown": result.markdown,
+        "raw_markdown": result.raw_markdown,
         "title": result.title,
         "success": result.success,
         "error": result.error,
@@ -147,11 +158,15 @@ async def convert_llm(req: ConvertRequest, sse: bool = False):
         "elapsed_ms": result.elapsed_ms,
         "used_llm": result.used_llm,
     })
+    if result.success:
+        cache.put(str(result.source_path), result.markdown, result.raw_markdown,
+                  result.success, result.char_count, result.elapsed_ms, result.used_llm)
     config.save()
 
     return {
         "source_path": str(result.source_path),
         "markdown": result.markdown,
+        "raw_markdown": result.raw_markdown,
         "title": result.title,
         "success": result.success,
         "error": result.error,
@@ -175,13 +190,14 @@ async def convert_batch(req: BatchConvertRequest, sse: bool = False):
         )
 
     converter = Converter(config)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     results = []
     for fp in req.file_paths:
         result = await loop.run_in_executor(None, converter.convert, fp)
         results.append({
             "source_path": str(result.source_path),
             "markdown": result.markdown,
+            "raw_markdown": result.raw_markdown,
             "title": result.title,
             "success": result.success,
             "error": result.error,
@@ -198,6 +214,9 @@ async def convert_batch(req: BatchConvertRequest, sse: bool = False):
             "elapsed_ms": result.elapsed_ms,
             "used_llm": False,
         })
+        if result.success:
+            cache.put(str(result.source_path), result.markdown, result.raw_markdown,
+                      result.success, result.char_count, result.elapsed_ms, False)
 
     config.save()
     return results
@@ -221,6 +240,7 @@ async def convert_batch_llm(req: BatchConvertRequest, sse: bool = False):
         results.append({
             "source_path": str(result.source_path),
             "markdown": result.markdown,
+            "raw_markdown": result.raw_markdown,
             "title": result.title,
             "success": result.success,
             "error": result.error,
@@ -237,6 +257,9 @@ async def convert_batch_llm(req: BatchConvertRequest, sse: bool = False):
             "elapsed_ms": result.elapsed_ms,
             "used_llm": result.used_llm,
         })
+        if result.success:
+            cache.put(str(result.source_path), result.markdown, result.raw_markdown,
+                      result.success, result.char_count, result.elapsed_ms, result.used_llm)
 
     config.save()
     return results
